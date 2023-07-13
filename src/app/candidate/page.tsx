@@ -17,11 +17,11 @@ export default function Home() {
   const socket = useSocket({
     baseurl: "https://openmediavault-1.hawk-pike.ts.net/",
     events: {
-      connect: (event) => {console.log("connected", event)},
+      connect: onConnected,
       disconnect: (event) => {console.log("disconnected", event)},
       init: (event) => {console.log("init", event)},
-      "interviewer-response": onChatThread,
-      "interviewee-response": onChatThread,
+      "interviewer-response": onInterviewerResponse,
+      "interviewee-response": onIntervieweeResponse,
     }
   })
   const searchParams = useSearchParams();
@@ -37,22 +37,34 @@ export default function Home() {
     event.preventDefault();
     socket.emit("interviewee-response", {
       messageType: "interviewee-response",
-      interviewId: "dd8a50e0-822e-47b3-a784-648265bad6d3",
+      interviewId,
       payload: {content: value}
     });
     setValue("")
   }
 
-  const onClickJoinInterview = () => {
-    socket.emit("join-interview", {
-      interviewId: "dd8a50e0-822e-47b3-a784-648265bad6d3",
-      clientId: "56a119e8-4aa6-4b7d-a781-e293a08dc141"
-    });
-    setStartInterview(true)
+  const onClickJoinInterview = () => setStartInterview(true)
+
+  function onInterviewerResponse (event: any) {
+    setChatThread((prev: any) => [{
+      from: "RECEIVER",
+      content: event
+    }, ...prev])
   }
 
-  function onChatThread (event: any) {
-    setChatThread((prev: any) => [...prev, event])
+  function onIntervieweeResponse (event: any) {
+    setChatThread((prev: any) => [{
+      from: "SENDER",
+      content: event
+    }, ...prev])
+  }
+
+  function onConnected (event: any) {
+    console.log("connected", event)
+    socket.emit("join-interview", {
+      interviewId,
+      clientId
+    });
   }
 
   return (
@@ -63,13 +75,13 @@ export default function Home() {
           <form className='flex flex-col h-full w-full max-w-lg mx-auto' onSubmit={onSubmit}>
             <div className='py-10 h-full flex flex-col-reverse w-full gap-10  overflow-y-scroll'>
               {chatThread.map((item: any, idx: number) => (
-                <ChatThreadItem sent={item?.sender} key={idx}>
-                  {item.text}
+                <ChatThreadItem sent={item?.from === "SENDER"} key={idx}>
+                  {item?.content}
                 </ChatThreadItem>
               ))}
             </div>
             <div className='w-full flex'>
-              <input className='w-full rounded-l text-black' onChange={onChange} value={value}/>
+              <input className='px-3 w-full rounded-l text-black' onChange={onChange} value={value}/>
               <button type='submit' className='px-4 py-1.5 bg-blue-500 text-lg rounded-r uppercase font-medium'>send</button>
             </div>
           </form>
